@@ -74,7 +74,7 @@ CORS(
     app,
     resources={
         r"/*": {
-            "origins": "http://" + cors_host + ":" + cors_port,
+            "origins": "http://" + cors_host, #+ ":" + cors_port,
             "supports_credentials": True,
             "Access-Control-Allow-Credentials": True,
         }
