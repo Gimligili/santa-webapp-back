@@ -7,7 +7,7 @@
         "db_name": "webappdb"
     },
     "cors_config": {
-        "host": "santa-webapp-front.gimligili.fr",
+        "host": "santa.gimligili.fr",
         "port": "80"
     },
     "flask_server": {
