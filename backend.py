@@ -101,7 +101,7 @@ db = SQLAlchemy(app)
 ####################################################################################################
 
 def encrypt_data(data, key):
-    iv = os.random(16)  # Initialization vector
+    iv = secrets.token_bytes(16)  # Initialization vector
     key = key.encode()
     data = data.encode()
     cipher = Cipher(algorithms.AES(key), modes.CFB(iv), backend=default_backend())
