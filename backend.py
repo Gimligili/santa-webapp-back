@@ -379,11 +379,11 @@ def changepassword():
         db.session.commit()
         return "Update Password"
 
-@app.route('/api/changeprofile/<int:userid>', methods = ['PUT'])
+@app.route('/api/changeprofile', methods = ['PUT'])
 @login_required
-def changeprofile(userid):
+def changeprofile():
     change_profile_request = request.get_json()
-    user = User.query.filter_by(id=userid).first()
+    user = current_user
     dbentry = User.query.filter_by(login=change_profile_request['login']).all()
 
     if dbentry == [] or user.login == change_profile_request['login']:
