@@ -74,7 +74,7 @@ CORS(
     app,
     resources={
         r"/*": {
-            "origins": "http://" + cors_host, #+ ":" + cors_port,
+            "origins": "https://" + cors_host,
             "supports_credentials": True,
             "Access-Control-Allow-Credentials": True,
         }
@@ -88,20 +88,20 @@ def generate_secret_key(length=24):
 app.config['SQLALCHEMY_DATABASE_URI'] = 'mariadb+mariadbconnector://' + username + ':' + password + '@' + db_host + '/' + db_name
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = generate_secret_key()
-db = SQLAlchemy(app)
 
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['REMEMBER_COOKIE_HTTPONLY'] = True
 app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = True
 
-
+db = SQLAlchemy(app)
 ####################################################################################################
 ##########################################   PEPPERING   ###########################################
 ####################################################################################################
 
 def encrypt_data(data, key):
-    iv = os.urandom(16)  # Initialization vector
+    iv = os.random(16)  # Initialization vector
     key = key.encode()
     data = data.encode()
     cipher = Cipher(algorithms.AES(key), modes.CFB(iv), backend=default_backend())
