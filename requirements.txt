@@ -1,0 +1,10 @@
+Flask
+Flask_Cors
+Flask_SQLAlchemy
+flask-login
+sqlalchemy-utils
+argon2-cffi
+cffi
+cryptography
+mariadb
+waitress

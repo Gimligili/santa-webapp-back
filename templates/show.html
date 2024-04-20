@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Awesome Santa WebApp</title>
+    </head>
+    <body>
+        <h1>Database content</h1>
+        <table border = 1>
+            <tr>
+                <th> Id </th>
+                <th> Destination url </th>
+                <th> Public link </th>
+                <th> Private link </th>
+                <th> Nb clicks </th>
+            </tr>
+            {% for value in records %}
+                <tr>
+                    <th> {{ value.id }} </th>
+                    <th> {{ value.dest_url }} </th>
+                    <td> {{ value.public_link }} </td>
+                    <td> {{ value.private_link }} </td>
+                    <td> {{ value.nb_click }} </td>
+                </tr>
+            {% endfor %}
+        </table>
+
+    </body>
+</html>

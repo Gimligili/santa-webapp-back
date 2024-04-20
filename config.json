@@ -1,0 +1,26 @@
+{
+    "database": {
+        "username": "santaweb",
+        "password": "xB5p84TEBahGS7huU5ML5oPSUDRovZCspxxv83kh",
+        "host": "172.25.0.2",
+        "port": 3306,
+        "db_name": "webappdb"
+    },
+    "cors_config": {
+        "host": "localhost",
+        "port": "8080"
+    },
+    "flask_server": {
+        "host": "0.0.0.0",
+        "port": 5000,
+        "debug": "False"
+    },
+    "security": {
+        "pepper": "fh0KqepMKJ6Ee4KbTt4scImphDZJ9cc6",
+        "group_pepper": "JjCJElwebRDOyqGBuXgMoZ9aVq2DOE0D"
+    },
+    "inactivity_policy": {
+        "max_inactivity" : 180,
+        "check_interval" : 86400 
+    }
+}
