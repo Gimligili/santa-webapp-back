@@ -13,7 +13,7 @@
     "flask_server": {
         "host": "0.0.0.0",
         "port": 5000,
-        "debug": "True"
+        "debug": "False"
     },
     "security": {
         "pepper": "fh0KqepMKJ6Ee4KbTt4scImphDZJ9cc6",
