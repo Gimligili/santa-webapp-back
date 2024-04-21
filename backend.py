@@ -7,6 +7,7 @@ import json
 import secrets
 import string
 from waitress import serve
+import random
 
 from threading import Timer
 
@@ -213,6 +214,8 @@ class GiftGroup(db.Model):
     join_code = db.Column(db.LargeBinary)
     hint = db.Column(db.String(100))
     creatorID = db.Column(db.String(100))
+    secret_santa_active = db.Column(db.Boolean)
+    secret_santa_date = db.Column(db.Date)
 
     def __init__(self, name, visibility, join_code, creatorID):
         self.name = name
@@ -222,6 +225,8 @@ class GiftGroup(db.Model):
         self.join_code = encrypt_data(hashed_code, GROUP_PEPPER)
         self.hint = join_code[:1] + '*' * (len(join_code) - 2) + join_code[-1:]
         self.creatorID = creatorID
+        self.secret_santa_active = False
+        self.secret_santa_date = datetime.now()
 
     def check_join_code(self,code_to_check):
         argon_init = PasswordHasher()
@@ -242,6 +247,16 @@ class GiftGroupMember(db.Model):
        self.groupID = groupID
        self.memberID = memberID
 
+class SecretSantaPair(db.Model):
+    id = db.Column(db.Integer, primary_key = True)
+    receiverID = db.Column(db.Integer)
+    gifterID = db.Column(db.Integer)
+    groupID = db.Column(db.Integer)
+
+    def __init__(self, receiverID, gifterID, groupID):
+       self.receiverID = receiverID
+       self.gifterID = gifterID
+       self.groupID = groupID
 
 ####################################################################################################
 ###########################################   FONCTIONS   ##########################################
@@ -283,6 +298,24 @@ def sanitize_email(email):
     if not re.match(email_regex, email):
         return None  # Return None if the email is invalid
     return email
+
+def generate_secret_pairs(users, group):
+
+    first_user = users[0]
+    receiver = users[0]
+    while users != []:
+        users.remove(receiver)
+        if len(users) != 0:
+            gifter = users[random.randint(0, len(users)-1)]
+        else:
+            gifter = first_user
+        pair = SecretSantaPair(receiver,gifter,group)
+        db.session.add(pair)
+        receiver = gifter
+    db.session.commit()
+
+    return 'OK'
+    
 
 ####################################################################################################
 ########################################  INACTIVE USERS   #########################################
@@ -700,6 +733,103 @@ def delete_group():
         db.session.commit()
         return "The group has been removed."
 
+@app.route('/api/secret/start', methods=['POST'])
+@login_required
+def secret_stanta_start():
+    user_id = current_user.id
+    start_request = request.get_json()
+    
+    scheduled_date = string_to_date(start_request['date'])
+    group = db.session.query(GiftGroup).filter(GiftGroup.id == start_request['groupID']).first()
+
+    if not(str(group.creatorID) == str(user_id)):
+        return 'Only group admin can start Secret Santa'
+
+    if scheduled_date == 'Incorrect date format':
+        return 'Incorrect date format'
+
+    users_in_group = db.session.query(GiftGroupMember).filter(GiftGroupMember.groupID == start_request['groupID']).all()
+    userids = []
+    for pair in users_in_group:
+        userids.append(pair.memberID)
+    if len(userids) < 3:
+        return 'Not enough members in the group, you must have at least 3 members'
+    
+    status = generate_secret_pairs(userids, group.id)
+    if status != 'OK':
+        return 'Pairs couldn\'t be generated'
+
+    group.secret_santa_active = True
+    group.secret_santa_date = scheduled_date
+    db.session.commit()
+    return "Secret Santa started"
+
+@app.route('/api/secret/reschedule', methods=['POST'])
+@login_required
+def secret_stanta_reschedule():
+    user_id = current_user.id
+    schedule_request = request.get_json()
+    
+    scheduled_date = string_to_date(schedule_request['date'])
+    group = db.session.query(GiftGroup).filter(GiftGroup.id == schedule_request['groupID']).first()
+    if group.secret_santa_active != True:
+        return "You can't reschedule, no Secret Santa is started"
+    if not(str(group.creatorID) == str(user_id)):
+        return 'Only group admin can schedule Secret Santa'
+
+    if scheduled_date == 'Incorrect date format':
+        return 'Incorrect date format'
+
+    group.secret_santa_date = scheduled_date
+    db.session.commit()
+    return "Secret Santa rescheduled"
+
+@app.route('/api/secret/stop', methods=['POST'])
+@login_required
+def secret_stanta_stop():
+    user_id = current_user.id
+    stop_request = request.get_json()
+    
+    group = db.session.query(GiftGroup).filter(GiftGroup.id == stop_request['groupID']).first()
+
+    if not(group.secret_santa_active == True):
+        return "No Secret Santa active"
+
+    if not(str(group.creatorID) == str(user_id)):
+        return 'Only group admin can stop Secret Santa'
+
+    pairs = db.session.query(SecretSantaPair).filter(SecretSantaPair.groupID == stop_request['groupID']).all()
+    for pair in pairs:
+        db.session.delete(pair)
+        db.session.commit()
+
+    group.secret_santa_active = False
+    db.session.commit()
+    return "Secret Santa stopped"
+
+@app.route('/api/secret/mysecret/group/<int:group_id>', methods=['GET'])
+@login_required
+def my_secret(group_id):
+    user_id = current_user.id
+    
+    group = db.session.query(GiftGroup).filter(GiftGroup.id == group_id).first()
+
+    if not(group.secret_santa_active == True):
+        return "No Secret Santa active"
+   
+
+    pair = db.session.query(SecretSantaPair).filter(SecretSantaPair.groupID == group_id and SecretSantaPair.gifterID == user_id).first()
+    receiver = db.session.query(User).filter(User.id == pair.receiverID).first()
+
+    data = {}
+    data['receiverLogin'] = receiver.login
+    data['date'] = date_to_string(group.secret_santa_date)
+
+    gifts = db.session.query(Gift).filter(Gift.receiverID == receiver.id).all()
+    data['gifts'] = gifts
+
+    return jsonify(data)
+    
 ####################################################################################################
 ###########################################   EXECUTION   ##########################################
 ####################################################################################################
