@@ -741,6 +741,8 @@ def secret_stanta_start():
     
     scheduled_date = string_to_date(start_request['date'])
     group = db.session.query(GiftGroup).filter(GiftGroup.id == start_request['groupID']).first()
+    if group == None:
+        return "Invalid group"
 
     if not(str(group.creatorID) == str(user_id)):
         return 'Only group admin can start Secret Santa'
@@ -772,6 +774,9 @@ def secret_stanta_reschedule():
     
     scheduled_date = string_to_date(schedule_request['date'])
     group = db.session.query(GiftGroup).filter(GiftGroup.id == schedule_request['groupID']).first()
+    if group == None:
+        return "Invalid group"
+
     if group.secret_santa_active != True:
         return "You can't reschedule, no Secret Santa is started"
     if not(str(group.creatorID) == str(user_id)):
@@ -791,6 +796,8 @@ def secret_stanta_stop():
     stop_request = request.get_json()
     
     group = db.session.query(GiftGroup).filter(GiftGroup.id == stop_request['groupID']).first()
+    if group == None:
+        return "Invalid group"
 
     if not(group.secret_santa_active == True):
         return "No Secret Santa active"
@@ -813,12 +820,15 @@ def my_secret(group_id):
     user_id = current_user.id
     
     group = db.session.query(GiftGroup).filter(GiftGroup.id == group_id).first()
-
+    if group == None:
+        return jsonify({'status': 'no group'})
+        
     if not(group.secret_santa_active == True):
-        return "No Secret Santa active"
+        return jsonify({'status': 'No Secret Santa active'})
    
 
-    pair = db.session.query(SecretSantaPair).filter(SecretSantaPair.groupID == group_id and SecretSantaPair.gifterID == user_id).first()
+    pair = db.session.query(SecretSantaPair).filter(SecretSantaPair.groupID == group_id, SecretSantaPair.gifterID == user_id).first()
+
     receiver = db.session.query(User).filter(User.id == pair.receiverID).first()
 
     data = {}
@@ -826,10 +836,33 @@ def my_secret(group_id):
     data['date'] = date_to_string(group.secret_santa_date)
 
     gifts = db.session.query(Gift).filter(Gift.receiverID == receiver.id).all()
-    data['gifts'] = gifts
-
+    gifts_list = [{
+        "giftID": gift.giftID,
+        "name": gift.name,
+        "description": gift.description,
+        "price": gift.price,
+        "receiverID": gift.receiverID,
+        "gifterID": gift.gifterID,
+        "image_url": gift.image_url
+    } for gift in gifts]
+    data['gifts'] = gifts_list
+    data['status'] = 'OK'
     return jsonify(data)
+
+@app.route('/api/secret/active/group/<int:group_id>', methods=['GET'])
+@login_required
+def is_active(group_id):
+    user_id = current_user.id
     
+    group = db.session.query(GiftGroup).filter(GiftGroup.id == group_id).first()
+    if group == None:
+        return jsonify({'status': 'no group'})
+    if group.secret_santa_active == True:
+        return jsonify({'status': 'active'})
+    else:
+        return jsonify({'status': 'inactive'})
+        
+
 ####################################################################################################
 ###########################################   EXECUTION   ##########################################
 ####################################################################################################
