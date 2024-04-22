@@ -32,11 +32,13 @@ def load_config(file_path):
     return config
 
 config = load_config('config.json')
+secret_config = load_config('secret_config.json')
 
 # Extract database configuration
 db_config = config['database']
+db_secret_config = secret_config['database']
 username = db_config['username']
-password = db_config['password']
+password = db_secret_config['password']
 db_host = db_config['host']
 db_port = db_config['port']
 db_name = db_config['db_name']
@@ -48,14 +50,18 @@ server_port = server_config['port']
 server_debug = server_config["debug"] == "True"
 
 # Extract Password Security configuration
-security_config = config['security']
+security_config = secret_config['security']
 PEPPER = security_config['pepper']
 GROUP_PEPPER = security_config['group_pepper']
 
 # Extract CORS configuration
 cors_config = config['cors_config']
 cors_host = cors_config['host']
-cors_port = cors_config['port']
+
+if server_debug:
+    cors_protocol = 'http'
+else:
+    cors_protocol = 'https'
 
 # Extract Account Inactivity Policy Configuration
 inactivity_policy_config = config['inactivity_policy']
@@ -74,7 +80,7 @@ CORS(
     app,
     resources={
         r"/*": {
-            "origins": "https://" + cors_host,
+            "origins": cors_protocol + "://" + cors_host,
             "supports_credentials": True,
             "Access-Control-Allow-Credentials": True,
         }
@@ -93,7 +99,10 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['REMEMBER_COOKIE_HTTPONLY'] = True
 app.config['REMEMBER_COOKIE_SAMESITE'] = 'Lax'
-app.config['SESSION_COOKIE_SECURE'] = True
+
+if not(server_debug):
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['REMEMBER_COOKIE_SECURE'] = True
 
 db = SQLAlchemy(app)
 ####################################################################################################
@@ -714,7 +723,8 @@ if __name__ == '__main__':
         # Create all tables defined in the models
         db.create_all()
 
-        check_inactive_users_periodically()
+        if not(server_debug):
+            check_inactive_users_periodically()
 
     login_manager = LoginManager()
     login_manager.init_app(app)
