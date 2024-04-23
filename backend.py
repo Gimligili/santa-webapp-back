@@ -236,6 +236,12 @@ class GiftGroup(db.Model):
             return True
         except exceptions.VerifyMismatchError:
             return False
+    
+    def change_join_code(self,new_join_code):
+        argon_init = PasswordHasher()
+        hashed_code = argon_init.hash(new_join_code + GROUP_PEPPER)
+        self.join_code = encrypt_data(hashed_code, GROUP_PEPPER)
+        self.hint = new_join_code[:1] + '*' * (len(new_join_code) - 2) + new_join_code[-1:]
 
 
 class GiftGroupMember(db.Model):
@@ -647,6 +653,61 @@ def group_admin():
 
     return jsonify(group_list)
 
+@app.route('/api/group/info/<int:group_id>', methods=['GET'])
+@login_required
+def group_info(group_id):
+    user_id = current_user.id
+    group = db.session.query(GiftGroup).filter(GiftGroup.id == group_id).first()
+
+    if group == None:
+        return jsonify({'status':'Group does not exist'})
+
+    if str(group.creatorID) != str(user_id):
+        return jsonify({'status':'You are not an admin of the group'})
+
+    group_json = {
+        "id" : group.id,
+        "name" : group.name,
+        "visibility" : group.visibility,
+        "join_code" : group.hint
+    }
+
+    gift_group_members = db.session.query(GiftGroupMember).filter_by(groupID=group_id).all()
+    userids = set()
+    for gift_group_member in gift_group_members:
+        userids.add(gift_group_member.memberID)
+    logins = []
+    for userid in userids:
+        user = db.session.query(User).filter(User.id==userid).first()
+        logins.append(user.login)
+    group_json['members'] = logins
+    group_json['status'] = 'OK'
+    return jsonify(group_json)
+
+@app.route('/api/group/update', methods=['POST'])
+@login_required
+def update_group():
+    user_id = current_user.id
+    update_request = request.get_json()
+    
+    group = db.session.query(GiftGroup).filter(GiftGroup.id == update_request['groupID']).first()
+
+    if group == None:
+        return "Group does not exist"
+
+    if str(group.creatorID) != str(user_id):
+        return "You are not an admin of the group"
+
+
+    if not(update_request['visibility'] == 'protected' or update_request['visibility'] == 'public'):
+        return 'Invalid Visibility'
+
+    group.visibility = update_request['visibility']
+    group.name = update_request['groupName']
+    if update_request['update_code'] != 'false':
+        group.change_join_code(update_request['join_code'])
+    db.session.commit()
+    return "Group updated"
 
 @app.route('/api/group/join', methods=['POST'])
 @login_required
@@ -746,6 +807,9 @@ def secret_stanta_start():
 
     if not(str(group.creatorID) == str(user_id)):
         return 'Only group admin can start Secret Santa'
+
+    if group.secret_santa_active == True:
+        return "Secret Santa already active"
 
     if scheduled_date == 'Incorrect date format':
         return 'Incorrect date format'
@@ -849,19 +913,23 @@ def my_secret(group_id):
     data['status'] = 'OK'
     return jsonify(data)
 
-@app.route('/api/secret/active/group/<int:group_id>', methods=['GET'])
+@app.route('/api/secret/info/group/<int:group_id>', methods=['GET'])
 @login_required
 def is_active(group_id):
     user_id = current_user.id
     
     group = db.session.query(GiftGroup).filter(GiftGroup.id == group_id).first()
+    
+    info_json = {}
+
     if group == None:
-        return jsonify({'status': 'no group'})
+        return jsonify({'status': 'Invalid group'})
     if group.secret_santa_active == True:
-        return jsonify({'status': 'active'})
+        info_json['secret_santa'] = 'true'
+        info_json['date'] = date_to_string(group.secret_santa_date)
     else:
-        return jsonify({'status': 'inactive'})
-        
+        info_json['secret_santa'] = 'false'
+    return jsonify(info_json)
 
 ####################################################################################################
 ###########################################   EXECUTION   ##########################################
