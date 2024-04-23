@@ -608,7 +608,11 @@ def my_groups():
     groups = []
     
     for membership, group in user_groups:
-        groups.append({"id": group.id, "name": group.name})
+        if group.secret_santa_active:
+            secret_santa = "Yes"
+        else:
+            secret_santa = ""
+        groups.append({"id": group.id, "name": group.name, "secret_santa": secret_santa})
     groups = sorted(groups, key=lambda x: x['id'])
     return jsonify(groups)
 
@@ -644,12 +648,20 @@ def create_group():
 def group_admin():
     user_id = current_user.id
     groups_administred = db.session.query(GiftGroup).filter(GiftGroup.creatorID == user_id).all()
-    group_list = [{
-        "id" : group.id,
-        "name" : group.name,
-        "visibility" : group.visibility,
-        "join_code" : group.hint
-    } for group in groups_administred]
+    
+    group_list = []
+    for group in groups_administred:
+        if group.secret_santa_active:
+            secret_santa = "Yes"
+        else:
+            secret_santa = "" 
+        group_list.append({
+            "id" : group.id,
+            "name" : group.name,
+            "visibility" : group.visibility,
+            "join_code" : group.hint,
+            "secret_santa": secret_santa
+        })
 
     return jsonify(group_list)
 
