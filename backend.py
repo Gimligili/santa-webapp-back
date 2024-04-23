@@ -367,17 +367,34 @@ def signup():
 @app.route('/api/changepassword', methods = ['PUT'])
 @login_required
 def changepassword():
-    user_login = current_user.login
-    user = User.query.filter_by(login=user_login).first()
+    user_id = current_user.id
+    user = db.session.query(User).filter(User.id==user_id).first()
     change_password_request = request.get_json()
+    
     if user.check_password(change_password_request['new_password']):
         return "No change made"
     elif not(user.check_password(change_password_request['old_password'])):
         return "No change made, Wrong Password"
     else :
-        current_user.update_password(change_password_request['old_password'], change_password_request['new_password'])
+        current_user.update_password(change_password_request['new_password'])
         db.session.commit()
         return "Update Password"
+
+@app.route('/api/user/delete', methods = ['DELETE'])
+@login_required
+def delete_user():
+    user_id = current_user.id
+    user = db.session.query(User).filter(User.id==user_id).first()
+    delete_request = request.get_json()
+    if not(user.check_password(delete_request['password'])):
+        return "Wrong password"
+    memberships = db.session.query(GiftGroupMember).filter(GiftGroupMember.memberID == user_id).all()
+    for membership in memberships:
+        db.session.delete(membership)
+    db.session.delete(user)
+    db.session.commit()
+    logout_user()
+    return "User deleted"
 
 @app.route('/api/changeprofile', methods = ['PUT'])
 @login_required
