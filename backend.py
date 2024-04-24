@@ -906,23 +906,31 @@ def my_secret(group_id):
     pair = db.session.query(SecretSantaPair).filter(SecretSantaPair.groupID == group_id, SecretSantaPair.gifterID == user_id).first()
 
     receiver = db.session.query(User).filter(User.id == pair.receiverID).first()
+    
 
     data = {}
-    data['receiverLogin'] = receiver.login
+
     data['date'] = date_to_string(group.secret_santa_date)
 
-    gifts = db.session.query(Gift).filter(Gift.receiverID == receiver.id).all()
-    gifts_list = [{
-        "giftID": gift.giftID,
-        "name": gift.name,
-        "description": gift.description,
-        "price": gift.price,
-        "receiverID": gift.receiverID,
-        "gifterID": gift.gifterID,
-        "image_url": gift.image_url
-    } for gift in gifts]
-    data['gifts'] = gifts_list
-    data['status'] = 'OK'
+    if receiver == None:
+        data['receiverLogin'] = 'The User has been deleted, please contact your group admin'
+        data['status'] = 'No users'
+        data['gifts'] = []
+    else:
+        data['receiverLogin'] = receiver.login
+
+        gifts = db.session.query(Gift).filter(Gift.receiverID == receiver.id).all()
+        gifts_list = [{
+            "giftID": gift.giftID,
+            "name": gift.name,
+            "description": gift.description,
+            "price": gift.price,
+            "receiverID": gift.receiverID,
+            "gifterID": gift.gifterID,
+            "image_url": gift.image_url
+        } for gift in gifts]
+        data['gifts'] = gifts_list
+        data['status'] = 'OK'
     return jsonify(data)
 
 @app.route('/api/secret/info/group/<int:group_id>', methods=['GET'])
