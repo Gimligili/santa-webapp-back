@@ -447,15 +447,26 @@ def delete_user():
 
     for group in admin_groups:
         members = db.session.query(GiftGroupMember).filter(GiftGroupMember.groupID == group.id).all()
+        pairs = db.session.query(SecretSantaPair).filter(SecretSantaPair.groupID == group.id).all()
         db.session.delete(group)
         
         for member in members:
             db.session.delete(member)
+        for pair in pairs:
+            db.session.delete(pair)
 
     memberships = db.session.query(GiftGroupMember).filter(GiftGroupMember.memberID == user_id).all()
 
     for membership in memberships:
         db.session.delete(membership)
+
+    gifter_pairs = db.session.query(SecretSantaPair).filter(SecretSantaPair.gifterID == user.id).all()
+    for pair in gifter_pairs:
+        pair.gifterID = -1
+    receiver_pairs = db.session.query(SecretSantaPair).filter(SecretSantaPair.receiverID == user.id).all()
+    for pair in receiver_pairs:
+        pair.receiverID = -1
+    
 
     db.session.delete(user)
 
