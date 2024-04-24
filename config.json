@@ -1,23 +1,17 @@
 {
     "database": {
         "username": "root",
-        "password": "uc&^F>uw0AOZm7Hv>H|b'|8<DA;dF4z%",
         "host": "srv-captain--santa-webapp-db",
         "port": 3306,
         "db_name": "webappdb"
     },
     "cors_config": {
-        "host": "santa.gimligili.fr",
-        "port": "80"
+        "host": "santa.gimligili.fr"
     },
     "flask_server": {
         "host": "0.0.0.0",
         "port": 5000,
         "debug": "False"
-    },
-    "security": {
-        "pepper": "fh0KqepMKJ6Ee4KbTt4scImphDZJ9cc6",
-        "group_pepper": "JjCJElwebRDOyqGBuXgMoZ9aVq2DOE0D"
     },
     "inactivity_policy": {
         "max_inactivity" : 180,
