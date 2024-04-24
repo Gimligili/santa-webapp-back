@@ -799,10 +799,13 @@ def delete_group():
         abort(401)
     else:
         members = db.session.query(GiftGroupMember).filter(GiftGroupMember.groupID == group.id).all()
+        pairs = db.session.query(SecretSantaPair).filter(SecretSantaPair.groupID == group.id).all()
         db.session.delete(group)
         
         for member in members:
             db.session.delete(member)
+        for pair in pairs:
+            db.session.delete(pair)
         db.session.commit()
         return "The group has been removed."
 
