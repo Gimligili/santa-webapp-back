@@ -232,7 +232,10 @@ class GiftGroup(db.Model):
         argon_init = PasswordHasher()
         hashed_code = argon_init.hash(join_code + GROUP_PEPPER)
         self.join_code = encrypt_data(hashed_code, GROUP_PEPPER)
-        self.hint = join_code[:1] + '*' * (len(join_code) - 2) + join_code[-1:]
+        if len(join_code) == 1:
+            self.hint = join_code
+        else:
+            self.hint = join_code[:1] + '*' * (len(join_code) - 2) + join_code[-1:]
         self.creatorID = creatorID
         self.secret_santa_active = False
         self.secret_santa_date = datetime.now()
@@ -250,7 +253,10 @@ class GiftGroup(db.Model):
         argon_init = PasswordHasher()
         hashed_code = argon_init.hash(new_join_code + GROUP_PEPPER)
         self.join_code = encrypt_data(hashed_code, GROUP_PEPPER)
-        self.hint = new_join_code[:1] + '*' * (len(new_join_code) - 2) + new_join_code[-1:]
+        if len(new_join_code) == 1:
+            self.hint = new_join_code
+        else:
+            self.hint = new_join_code[:1] + '*' * (len(new_join_code) - 2) + new_join_code[-1:]
 
 
 class GiftGroupMember(db.Model):
@@ -896,7 +902,6 @@ def secret_stanta_stop():
     pairs = db.session.query(SecretSantaPair).filter(SecretSantaPair.groupID == stop_request['groupID']).all()
     for pair in pairs:
         db.session.delete(pair)
-        db.session.commit()
 
     group.secret_santa_active = False
     db.session.commit()
@@ -925,7 +930,8 @@ def my_secret(group_id):
     data['date'] = date_to_string(group.secret_santa_date)
 
     if receiver == None:
-        data['receiverLogin'] = 'The User has been deleted, please contact your group admin'
+        admin = db.session.query(User).filter(User.id == group.creatorID).first()
+        data['receiverLogin'] = 'The User has been deleted, please contact your group admin : ' + admin.login
         data['status'] = 'No users'
         data['gifts'] = []
     else:
