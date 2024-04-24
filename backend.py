@@ -327,7 +327,7 @@ def generate_secret_pairs(users, group):
     while users != []:
         users.remove(receiver)
         if len(users) != 0:
-            gifter = users[random.randint(0, len(users)-1)]
+            gifter = random.choice(users)
         else:
             gifter = first_user
         pair = SecretSantaPair(receiver,gifter,group)
@@ -851,14 +851,17 @@ def secret_stanta_start():
     if len(userids) < 3:
         return 'Not enough members in the group, you must have at least 3 members'
     
-    status = generate_secret_pairs(userids, group.id)
-    if status != 'OK':
-        return 'Pairs couldn\'t be generated'
+    try:
+        status = generate_secret_pairs(userids, group.id)
+        if status != 'OK':
+            return 'Pairs couldn\'t be generated'
 
-    group.secret_santa_active = True
-    group.secret_santa_date = scheduled_date
-    db.session.commit()
-    return "Secret Santa started"
+        group.secret_santa_active = True
+        group.secret_santa_date = scheduled_date
+        db.session.commit()
+        return "Secret Santa started"
+    except:
+        return "Unexpected error"
 
 @app.route('/api/secret/reschedule', methods=['POST'])
 @login_required
