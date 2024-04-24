@@ -7,6 +7,7 @@ import json
 import secrets
 import string
 from waitress import serve
+import random
 
 from threading import Timer
 
@@ -222,6 +223,8 @@ class GiftGroup(db.Model):
     join_code = db.Column(db.LargeBinary)
     hint = db.Column(db.String(100))
     creatorID = db.Column(db.String(100))
+    secret_santa_active = db.Column(db.Boolean)
+    secret_santa_date = db.Column(db.Date)
 
     def __init__(self, name, visibility, join_code, creatorID):
         self.name = name
@@ -229,8 +232,13 @@ class GiftGroup(db.Model):
         argon_init = PasswordHasher()
         hashed_code = argon_init.hash(join_code + GROUP_PEPPER)
         self.join_code = encrypt_data(hashed_code, GROUP_PEPPER)
-        self.hint = join_code[:1] + '*' * (len(join_code) - 2) + join_code[-1:]
+        if len(join_code) == 1:
+            self.hint = join_code
+        else:
+            self.hint = join_code[:1] + '*' * (len(join_code) - 2) + join_code[-1:]
         self.creatorID = creatorID
+        self.secret_santa_active = False
+        self.secret_santa_date = datetime.now()
 
     def check_join_code(self,code_to_check):
         argon_init = PasswordHasher()
@@ -240,6 +248,15 @@ class GiftGroup(db.Model):
             return True
         except exceptions.VerifyMismatchError:
             return False
+    
+    def change_join_code(self,new_join_code):
+        argon_init = PasswordHasher()
+        hashed_code = argon_init.hash(new_join_code + GROUP_PEPPER)
+        self.join_code = encrypt_data(hashed_code, GROUP_PEPPER)
+        if len(new_join_code) == 1:
+            self.hint = new_join_code
+        else:
+            self.hint = new_join_code[:1] + '*' * (len(new_join_code) - 2) + new_join_code[-1:]
 
 
 class GiftGroupMember(db.Model):
@@ -251,6 +268,16 @@ class GiftGroupMember(db.Model):
        self.groupID = groupID
        self.memberID = memberID
 
+class SecretSantaPair(db.Model):
+    id = db.Column(db.Integer, primary_key = True)
+    receiverID = db.Column(db.Integer)
+    gifterID = db.Column(db.Integer)
+    groupID = db.Column(db.Integer)
+
+    def __init__(self, receiverID, gifterID, groupID):
+       self.receiverID = receiverID
+       self.gifterID = gifterID
+       self.groupID = groupID
 
 ####################################################################################################
 ###########################################   FONCTIONS   ##########################################
@@ -292,6 +319,24 @@ def sanitize_email(email):
     if not re.match(email_regex, email):
         return None  # Return None if the email is invalid
     return email
+
+def generate_secret_pairs(users, group):
+
+    first_user = users[0]
+    receiver = users[0]
+    while users != []:
+        users.remove(receiver)
+        if len(users) != 0:
+            gifter = random.choice(users)
+        else:
+            gifter = first_user
+        pair = SecretSantaPair(receiver,gifter,group)
+        db.session.add(pair)
+        receiver = gifter
+    db.session.commit()
+
+    return 'OK'
+    
 
 ####################################################################################################
 ########################################  INACTIVE USERS   #########################################
@@ -610,7 +655,11 @@ def my_groups():
     groups = []
     
     for membership, group in user_groups:
-        groups.append({"id": group.id, "name": group.name})
+        if group.secret_santa_active:
+            secret_santa = "Yes"
+        else:
+            secret_santa = ""
+        groups.append({"id": group.id, "name": group.name, "secret_santa": secret_santa})
     groups = sorted(groups, key=lambda x: x['id'])
     return jsonify(groups)
 
@@ -646,15 +695,78 @@ def create_group():
 def group_admin():
     user_id = current_user.id
     groups_administred = db.session.query(GiftGroup).filter(GiftGroup.creatorID == user_id).all()
-    group_list = [{
+    
+    group_list = []
+    for group in groups_administred:
+        if group.secret_santa_active:
+            secret_santa = "Yes"
+        else:
+            secret_santa = "" 
+        group_list.append({
+            "id" : group.id,
+            "name" : group.name,
+            "visibility" : group.visibility,
+            "join_code" : group.hint,
+            "secret_santa": secret_santa
+        })
+
+    return jsonify(group_list)
+
+@app.route('/api/group/info/<int:group_id>', methods=['GET'])
+@login_required
+def group_info(group_id):
+    user_id = current_user.id
+    group = db.session.query(GiftGroup).filter(GiftGroup.id == group_id).first()
+
+    if group == None:
+        return jsonify({'status':'Group does not exist'})
+
+    if str(group.creatorID) != str(user_id):
+        return jsonify({'status':'You are not an admin of the group'})
+
+    group_json = {
         "id" : group.id,
         "name" : group.name,
         "visibility" : group.visibility,
         "join_code" : group.hint
-    } for group in groups_administred]
+    }
 
-    return jsonify(group_list)
+    gift_group_members = db.session.query(GiftGroupMember).filter_by(groupID=group_id).all()
+    userids = set()
+    for gift_group_member in gift_group_members:
+        userids.add(gift_group_member.memberID)
+    logins = []
+    for userid in userids:
+        user = db.session.query(User).filter(User.id==userid).first()
+        logins.append(user.login)
+    group_json['members'] = logins
+    group_json['status'] = 'OK'
+    return jsonify(group_json)
 
+@app.route('/api/group/update', methods=['POST'])
+@login_required
+def update_group():
+    user_id = current_user.id
+    update_request = request.get_json()
+    
+    group = db.session.query(GiftGroup).filter(GiftGroup.id == update_request['groupID']).first()
+
+    if group == None:
+        return "Group does not exist"
+
+    if str(group.creatorID) != str(user_id):
+        return "You are not an admin of the group"
+
+
+    if not(update_request['visibility'] == 'protected' or update_request['visibility'] == 'public'):
+        return 'Invalid Visibility'
+
+    group.visibility = update_request['visibility']
+    group.name = update_request['groupName']
+    if update_request['update_code'] != 'false':
+        group.change_join_code(update_request['join_code'])
+    db.session.commit()
+    return "Group updated"
 
 @app.route('/api/group/join', methods=['POST'])
 @login_required
@@ -734,12 +846,163 @@ def delete_group():
         abort(401)
     else:
         members = db.session.query(GiftGroupMember).filter(GiftGroupMember.groupID == group.id).all()
+        pairs = db.session.query(SecretSantaPair).filter(SecretSantaPair.groupID == group.id).all()
         db.session.delete(group)
         
         for member in members:
             db.session.delete(member)
+        for pair in pairs:
+            db.session.delete(pair)
         db.session.commit()
         return "The group has been removed."
+
+@app.route('/api/secret/start', methods=['POST'])
+@login_required
+def secret_stanta_start():
+    user_id = current_user.id
+    start_request = request.get_json()
+    
+    scheduled_date = string_to_date(start_request['date'])
+    group = db.session.query(GiftGroup).filter(GiftGroup.id == start_request['groupID']).first()
+    if group == None:
+        return "Invalid group"
+
+    if not(str(group.creatorID) == str(user_id)):
+        return 'Only group admin can start Secret Santa'
+
+    if group.secret_santa_active == True:
+        return "Secret Santa already active"
+
+    if scheduled_date == 'Incorrect date format':
+        return 'Incorrect date format'
+
+    users_in_group = db.session.query(GiftGroupMember).filter(GiftGroupMember.groupID == start_request['groupID']).all()
+    userids = []
+    for pair in users_in_group:
+        userids.append(pair.memberID)
+    if len(userids) < 3:
+        return 'Not enough members in the group, you must have at least 3 members'
+    
+    try:
+        status = generate_secret_pairs(userids, group.id)
+        if status != 'OK':
+            return 'Pairs couldn\'t be generated'
+
+        group.secret_santa_active = True
+        group.secret_santa_date = scheduled_date
+        db.session.commit()
+        return "Secret Santa started"
+    except:
+        return "Unexpected error"
+
+@app.route('/api/secret/reschedule', methods=['POST'])
+@login_required
+def secret_stanta_reschedule():
+    user_id = current_user.id
+    schedule_request = request.get_json()
+    
+    scheduled_date = string_to_date(schedule_request['date'])
+    group = db.session.query(GiftGroup).filter(GiftGroup.id == schedule_request['groupID']).first()
+    if group == None:
+        return "Invalid group"
+
+    if group.secret_santa_active != True:
+        return "You can't reschedule, no Secret Santa is started"
+    if not(str(group.creatorID) == str(user_id)):
+        return 'Only group admin can schedule Secret Santa'
+
+    if scheduled_date == 'Incorrect date format':
+        return 'Incorrect date format'
+
+    group.secret_santa_date = scheduled_date
+    db.session.commit()
+    return "Secret Santa rescheduled"
+
+@app.route('/api/secret/stop', methods=['POST'])
+@login_required
+def secret_stanta_stop():
+    user_id = current_user.id
+    stop_request = request.get_json()
+    
+    group = db.session.query(GiftGroup).filter(GiftGroup.id == stop_request['groupID']).first()
+    if group == None:
+        return "Invalid group"
+
+    if not(group.secret_santa_active == True):
+        return "No Secret Santa active"
+
+    if not(str(group.creatorID) == str(user_id)):
+        return 'Only group admin can stop Secret Santa'
+
+    pairs = db.session.query(SecretSantaPair).filter(SecretSantaPair.groupID == stop_request['groupID']).all()
+    for pair in pairs:
+        db.session.delete(pair)
+
+    group.secret_santa_active = False
+    db.session.commit()
+    return "Secret Santa stopped"
+
+@app.route('/api/secret/mysecret/group/<int:group_id>', methods=['GET'])
+@login_required
+def my_secret(group_id):
+    user_id = current_user.id
+    
+    group = db.session.query(GiftGroup).filter(GiftGroup.id == group_id).first()
+    if group == None:
+        return jsonify({'status': 'no group'})
+        
+    if not(group.secret_santa_active == True):
+        return jsonify({'status': 'No Secret Santa active'})
+   
+
+    pair = db.session.query(SecretSantaPair).filter(SecretSantaPair.groupID == group_id, SecretSantaPair.gifterID == user_id).first()
+
+    receiver = db.session.query(User).filter(User.id == pair.receiverID).first()
+    
+
+    data = {}
+
+    data['date'] = date_to_string(group.secret_santa_date)
+
+    if receiver == None:
+        admin = db.session.query(User).filter(User.id == group.creatorID).first()
+        data['receiverLogin'] = 'The User has been deleted, please contact your group admin : ' + admin.login
+        data['status'] = 'No users'
+        data['gifts'] = []
+    else:
+        data['receiverLogin'] = receiver.login
+
+        gifts = db.session.query(Gift).filter(Gift.receiverID == receiver.id).all()
+        gifts_list = [{
+            "giftID": gift.giftID,
+            "name": gift.name,
+            "description": gift.description,
+            "price": gift.price,
+            "receiverID": gift.receiverID,
+            "gifterID": gift.gifterID,
+            "image_url": gift.image_url
+        } for gift in gifts]
+        data['gifts'] = gifts_list
+        data['status'] = 'OK'
+    return jsonify(data)
+
+@app.route('/api/secret/info/group/<int:group_id>', methods=['GET'])
+@login_required
+def is_active(group_id):
+    user_id = current_user.id
+    
+    group = db.session.query(GiftGroup).filter(GiftGroup.id == group_id).first()
+    
+    info_json = {}
+
+    if group == None:
+        return jsonify({'status': 'Invalid group'})
+    if group.secret_santa_active == True:
+        info_json['secret_santa'] = 'true'
+        info_json['date'] = date_to_string(group.secret_santa_date)
+    else:
+        info_json['secret_santa'] = 'false'
+    return jsonify(info_json)
 
 ####################################################################################################
 ###########################################   EXECUTION   ##########################################
