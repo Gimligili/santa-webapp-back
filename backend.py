@@ -388,12 +388,27 @@ def delete_user():
     delete_request = request.get_json()
     if not(user.check_password(delete_request['password'])):
         return "Wrong password"
+    
+    admin_groups = db.session.query(GiftGroup).filter(GiftGroup.creatorID == user_id).all()
+
+    for group in admin_groups:
+        members = db.session.query(GiftGroupMember).filter(GiftGroupMember.groupID == group.id).all()
+        db.session.delete(group)
+        
+        for member in members:
+            db.session.delete(member)
+
     memberships = db.session.query(GiftGroupMember).filter(GiftGroupMember.memberID == user_id).all()
+
     for membership in memberships:
         db.session.delete(membership)
+
     db.session.delete(user)
+
     db.session.commit()
+    
     logout_user()
+    
     return "User deleted"
 
 @app.route('/api/changeprofile', methods = ['PUT'])
