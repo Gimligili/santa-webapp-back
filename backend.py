@@ -33,13 +33,11 @@ def load_config(file_path):
     return config
 
 config = load_config('config.json')
-secret_config = load_config('secret_config.json')
 
 # Extract database configuration
 db_config = config['database']
-db_secret_config = secret_config['database']
 username = db_config['username']
-password = db_secret_config['password']
+password = os.environ['SANTA_WEBAPP_DB_PASSWORD']
 db_host = db_config['host']
 db_port = db_config['port']
 db_name = db_config['db_name']
@@ -51,9 +49,8 @@ server_port = server_config['port']
 server_debug = server_config["debug"] == "True"
 
 # Extract Password Security configuration
-security_config = secret_config['security']
-PEPPER = security_config['pepper']
-GROUP_PEPPER = security_config['group_pepper']
+PEPPER = os.environ['SANTA_WEBAPP_USER_PEPPER']
+GROUP_PEPPER = os.environ['SANTA_WEBAPP_GROUP_PEPPER']
 
 # Extract CORS configuration
 cors_config = config['cors_config']
