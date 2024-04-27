@@ -2,9 +2,18 @@
 
 Pour déploiement correctement ce projet sur caprover, il convient de définir les trois variables d'environnement suivantes :
 <ul>
-  <li> Mot de passe de la base de données : `SANTA_WEBAPP_DB_PASSWORD` </li>
-  <li> Poivre pour sécuriser les mots de passe des utilisateurs : `SANTA_WEBAPP_USER_PEPPER` </li>
-  <li> Poivre pour sécuriser les mots de passe des groupes : `SANTA_WEBAPP_GROUP_PEPPER` </li>
+  <li> Mot de passe de la base de données :
+        
+    SANTA_WEBAPP_DB_PASSWORD
+  </li>
+  <li> Poivre pour sécuriser les mots de passe des utilisateurs : 
+    
+    SANTA_WEBAPP_USER_PEPPER
+  </li>
+  <li> Poivre pour sécuriser les mots de passe des groupes :
+    
+    SANTA_WEBAPP_GROUP_PEPPER
+  </li>
 </ul>
 
 Pour cela, le script Python ```secret_generator.py``` est disponible à la racine du projet.
