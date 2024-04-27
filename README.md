@@ -18,10 +18,7 @@ Pour déploiement correctement ce projet sur caprover, il convient de définir l
 
 Pour cela, le script Python ```secret_generator.py``` est disponible à la racine du projet.
 
-Il suffit alors de lancer la commande ```python3 secret_generator.py```, et d'ajouter la ligne :
-```export <env var name>="<env var value>"```
-à votre script de configuration de démarrage de shell (usuellement ```/home/<user>/.bashrc``` ou bien ```/home/<user>/.zshrc```), avant de lancer la commande :
-```source <shell config path>```.
+Il suffit alors d'aller dans le panneau de configuration de l'application sur l'interface web d'administration de Caprover et de créer les nouvelles entrées correspondantes pour les variables d'environnement.
 
 # Run mariadb
 ```sh
