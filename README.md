@@ -1,3 +1,19 @@
+# Déploiement Caprover
+
+Pour déploiement correctement ce projet sur caprover, il convient de définir les trois variables d'environnement suivantes :
+<ul>
+  <li>```SANTA_WEBAPP_DB_PASSWORD```</li>
+  <li>```SANTA_WEBAPP_USER_PEPPER```</li>
+  <li>```SANTA_WEBAPP_GROUP_PEPPER```</li>
+</ul>
+
+Pour cela, le script Python ```secret_generator.py``` est disponible à la racine du projet.
+
+Il suffit alors de lancer la commande ```python3 secret_generator.py```, et d'ajouter la ligne :
+```export <env var name>="<env var value>"```
+à votre script de configuration de démarrage de shell (usuellement ```/home/<user>/.bashrc``` ou bien ```/home/<user>/.zshrc```), avant de lancer la commande :
+```source <shell config path>```.
+
 # Run mariadb
 ```sh
 sudo docker run --name mariadbtest -e MYSQL_ROOT_PASSWORD=mypass -p 3306:3306 -d docker.io/library/mariadb:latest
